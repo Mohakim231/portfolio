@@ -14,7 +14,14 @@ export function setupSceneAndWorld() {
         solver: new CANNON.GSSolver()
     });
     world.broadphase = new CANNON.SAPBroadphase(world);
-    world.solver.iterations = 15;
+    
+    const isMobile = window.innerWidth <= 800 && 'ontouchstart' in window;
+    const pixelRatioCap = isMobile ? 1.5 : 2;
+    const shadowMapSize = isMobile ? 1024 : 4096;
+    const solverIterations = isMobile ? 10 : 15;
+    const shadowMapType = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+
+    world.solver.iterations = solverIterations;
     world.solver.tolerance = 0.01;
 
     const defaultMaterial = new CANNON.Material('default');
@@ -27,11 +34,12 @@ export function setupSceneAndWorld() {
     world.addContactMaterial(new CANNON.ContactMaterial(brickMaterial, brickMaterial, { friction: 0.1, restitution: 0.5 }));
     world.addContactMaterial(new CANNON.ContactMaterial(brickMaterial, defaultMaterial, { friction: 0.1, restitution: 0.4 }));
 
+    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = shadowMapType;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     document.body.appendChild(renderer.domElement);
@@ -52,8 +60,8 @@ export function setupSceneAndWorld() {
     sun.castShadow = true;
     sun.position.set(-50, 50, 10);
 
-    sun.shadow.mapSize.width = 4096;
-    sun.shadow.mapSize.height = 4096;
+    sun.shadow.mapSize.width = shadowMapSize;
+    sun.shadow.mapSize.height = shadowMapSize;
 
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 120;
@@ -65,6 +73,7 @@ export function setupSceneAndWorld() {
     
     sun.shadow.normalBias = 0.05;
     scene.add(sun);
+
 
     window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;

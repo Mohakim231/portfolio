@@ -115,7 +115,7 @@ export function createScaledTrimeshBody(mesh, mass, material) {
 
 export const parkingSpaces = {
     parking_gmail:   { url: 'mailto:mohamedhakim0381@gmail.com@gmail.com',  box: null },
-    parking_linkdin: { url: 'www.linkedin.com/in/mohamed-abdalla-80303a223', box: null }
+    parking_linkdin: { url: 'https://www.linkedin.com/in/mohamed-abdalla-80303a223', box: null }
   };
   
 export let currentParkingZone = null;

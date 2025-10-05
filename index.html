@@ -5,8 +5,28 @@
     <meta charset="utf-8">
     <title>Mohamed-Abdalla</title>
     <style>
-      body { margin: 0; }
+      body {
+        margin: 0;
+        background-color: #3F8363;
+      }
+      #launch-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #3F8363;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+      }
+      #launch-button {
+        display: none;
+      }
     </style>
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <div id="launch-screen">

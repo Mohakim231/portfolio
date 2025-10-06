@@ -3,6 +3,8 @@ import * as CANNON from 'cannon-es';
 import { keyState, touchState } from './controls.js';
 import { sounds, handleEngineAudio } from './audio.js';
 
+const isMobile = 'ontouchstart' in window && window.innerWidth <= 800;
+
 let car = {
     instance: null, vehicle: null, chassisBody: null,
     wheelMeshes: [], originalFriction: { front: 6, rear: 4 }
@@ -95,53 +97,38 @@ export function updateCarControls() {
 
     car.chassisBody.wakeUp();
 
-    const maxSteerVal = Math.PI / 16;
+    const maxSteerVal = Math.PI / 6;
     const maxForce = 600;
     let engineForce = 0;
     let steerValue = 0;
     let isShiftDownForAudio = keyState.shift;
-
+    
     if (touchState.active) {
         const carPosition = new THREE.Vector3().copy(car.chassisBody.position);
         const directionToTarget = touchState.target.clone().sub(carPosition);
         directionToTarget.y = 0;
 
         const distanceToTarget = directionToTarget.length();
-        
         const STOPPING_DISTANCE = 1.5;
+
         if (distanceToTarget > STOPPING_DISTANCE) {
-            const forwardVector = new THREE.Vector3(0, 0, 1);
-            forwardVector.applyQuaternion(car.chassisBody.quaternion);
+            const forwardVector = new THREE.Vector3(0, 0, 1).applyQuaternion(car.chassisBody.quaternion);
             forwardVector.y = 0;
-            
             const dot = forwardVector.dot(directionToTarget.clone().normalize());
-
-            const REVERSING_THRESHOLD = -0.3;
-
-            if (dot > 0) {
-                engineForce = -maxForce;
-            } else if (dot < REVERSING_THRESHOLD) {
-                engineForce = maxForce * 0.5;
-            }
+            
+            if (dot > 0) engineForce = -maxForce;
+            else if (dot < -0.3) engineForce = maxForce * 0.5;
 
             const angleToTarget = forwardVector.angleTo(directionToTarget);
-
             if (angleToTarget > 0.1) {
                 const cross = new THREE.Vector3().crossVectors(forwardVector, directionToTarget);
-                const turnDirection = cross.y > 0 ? 1 : -1;
-                steerValue = Math.min(angleToTarget, maxSteerVal) * turnDirection;
+                steerValue = Math.min(angleToTarget, maxSteerVal) * (cross.y > 0 ? 1 : -1);
             }
-
-            if (dot < 0) {
-                 steerValue *= -1;
-            }
+            if (dot < 0) steerValue *= -1;
         }
-        
         isShiftDownForAudio = false;
-
     } else {
-        if ((keyState.w || keyState.arrowup)) {
-            engineForce = keyState.shift ? -maxForce * 1.5 : -maxForce;}
+        if ((keyState.w || keyState.arrowup)) engineForce = keyState.shift ? -maxForce * 1.5 : -maxForce;
         else if (keyState.s || keyState.arrowdown) engineForce = maxForce;
 
         if (keyState.a || keyState.arrowleft) steerValue = maxSteerVal;
@@ -155,22 +142,29 @@ export function updateCarControls() {
 
     const speed = car.chassisBody.velocity.length();
     const now = Date.now();
-    const SKID_COOLDOWN = 3000;
-    const TURN_SKID_MIN_SPEED = 5;
-
-    if (steerValue !== 0 && speed > TURN_SKID_MIN_SPEED && now - lastSkidSoundTime > SKID_COOLDOWN) {
+    if (steerValue !== 0 && speed > 5 && now - lastSkidSoundTime > 3000) {
         if (sounds.skid && !sounds.skid.isPlaying) {
             sounds.skid.play();
             lastSkidSoundTime = now;
         }
     }
 
-    const brakeForce = 8, driftFriction = 1.3;
-    if (keyState[' ']) {
+    const brakeForce = 12;
+    const driftFriction = 1.3;
+
+    const isDrifting = keyState[' '];
+    const applyMobileBrake = isMobile && !touchState.active;
+
+    if (isDrifting) {
         car.vehicle.setBrake(brakeForce, 0);
         car.vehicle.setBrake(brakeForce, 1);
         car.vehicle.wheelInfos[2].frictionSlip = car.vehicle.wheelInfos[3].frictionSlip = driftFriction;
         if (sounds.drift && !sounds.drift.isPlaying) sounds.drift.play();
+    } else if (applyMobileBrake) {
+        car.vehicle.setBrake(brakeForce, 0);
+        car.vehicle.setBrake(brakeForce, 1);
+        car.vehicle.setBrake(brakeForce, 2);
+        car.vehicle.setBrake(brakeForce, 3);
     } else {
         car.vehicle.setBrake(0, 0);
         car.vehicle.setBrake(0, 1);

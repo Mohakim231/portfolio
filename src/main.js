@@ -32,7 +32,6 @@ class App {
             });
             const geometry = new THREE.PlaneGeometry(1, 1);
             const signMesh = new THREE.Mesh(geometry, material);
-
             return signMesh;
         } catch (error) {
             console.error("Could not load the enter-key'", error);
@@ -41,6 +40,8 @@ class App {
     }
 
     async init() {
+        const launchScreen = document.getElementById('launch-screen');
+        const progressBarContainer = document.getElementById('progress-bar');
         const progressBar = document.getElementById('progress-bar-inner');
         const progressText = document.getElementById('progress-text');
         const launchButton = document.getElementById('launch-button');
@@ -54,80 +55,84 @@ class App {
         };
 
         loadingManager.onLoad = () => {
-            gsap.to([progressBar.parentElement, progressText], {
-                duration: 0.5,
-                opacity: 0,
-                onComplete: () => {
-                    progressBar.parentElement.style.display = 'none';
-                    progressText.style.display = 'none';
-
-                    launchButton.disabled = false;
-                    launchButton.textContent = 'Start Engine';
-                    launchButton.style.display = 'block';
-
-                    gsap.fromTo(launchButton, { opacity: 0 }, { opacity: 1, duration: 0.5 });
-                }
-            });
+            progressText.innerText = 'Preparing scene...';
         };
 
         loadingManager.onError = (url) => {
             console.error(`There was an error loading ${url}`);
             progressText.innerText = `Error loading. Check console.`;
         };
-        const core = setupSceneAndWorld();
-        this.scene = core.scene;
-        this.world = core.world;
-        this.renderer = core.renderer;
-        this.camera = core.camera;
-        this.controls = core.controls;
-        this.materials = core.materials;
-
-        this.cannonDebugger = new CannonDebugger(this.scene, this.world);
         
         try {
-            this.enterSignMesh = await this.createEnterSign(loadingManager);
-            if (this.enterSignMesh) {
-                this.enterSignMesh.visible = false;
-                this.scene.add(this.enterSignMesh);
-            }
+            const core = setupSceneAndWorld();
+            this.scene = core.scene;
+            this.world = core.world;
+            this.renderer = core.renderer;
+            this.camera = core.camera;
+            this.controls = core.controls;
+            this.materials = core.materials;
 
-            const glb = await setupWorld(this.scene, this.world, this.materials, this.objectsToUpdate, this.wallBodies, this.hittableBodies);
+            this.cannonDebugger = new CannonDebugger(this.scene, this.world);
             
-            setupControls(resetCarOrientation, this.camera, groundMesh);
+            this.enterSignMesh = await this.createEnterSign(loadingManager);
+            const glb = await setupWorld(this.scene, this.world, this.materials, this.objectsToUpdate, this.wallBodies, this.hittableBodies, loadingManager);
 
             createVehicle(this.scene, this.world, this.materials, glb, this.wallBodies, this.hittableBodies, this.objectsToUpdate);
-            
-            await initAudio(this.scene, this.camera.children[0], car.instance);
+            await initAudio(this.scene, this.camera.children[0], car.instance, loadingManager);
+            setupControls(resetCarOrientation, this.camera, groundMesh);
 
             car.instance.getWorldPosition(this.lastCarPos);
             this.controls.target.copy(this.lastCarPos);
             this.camera.position.set(-9, 8, -0.1);
             
-            this.setupLaunchUI();
+            if (this.enterSignMesh) {
+                this.enterSignMesh.visible = false;
+                this.scene.add(this.enterSignMesh);
+            }
+
+            const readyTimeline = gsap.timeline();
+            readyTimeline.to([progressBarContainer, progressText], {
+                duration: 0.5,
+                opacity: 0,
+                onComplete: () => {
+                    progressBarContainer.style.display = 'none';
+                    progressText.style.display = 'none';
+                }
+            }).to(launchButton, {
+                duration: 0.5,
+                opacity: 1,
+                onStart: () => {
+                    launchButton.disabled = false;
+                    launchButton.textContent = 'Start Engine';
+                    launchButton.style.display = 'block';
+                }
+            }, ">-0.2");
+
+            const listener = this.camera.children[0];
+            launchButton.addEventListener('click', () => {
+                gsap.to(launchScreen, {
+                    duration: 0.8,
+                    opacity: 0,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        launchScreen.style.display = 'none';
+                    }
+                });
+
+                if (listener.context.state === 'suspended') {
+                    listener.context.resume();
+                }
+                sounds.engine.play();
+                sounds.accelStartThree.play();
+                sounds.accelStartThree.setVolume(0);
+                
+                this.renderer.setAnimationLoop(() => this.animate());
+            }, { once: true });
 
         } catch (error) {
             console.error("Failed to initialize the app:", error);
+            progressText.innerText = 'Failed to initialize. Check console.';
         }
-    }
-
-    setupLaunchUI() {
-        const launchButton = document.getElementById('launch-button');
-        const listener = this.camera.children[0];
-
-        launchButton.disabled = false;
-        launchButton.textContent = 'Start Engine';
-
-        launchButton.addEventListener('click', () => {
-            document.getElementById('launch-screen').style.display = 'none';
-            if (listener.context.state === 'suspended') {
-                listener.context.resume();
-            }
-            sounds.engine.play();
-            sounds.accelStartThree.play();
-            sounds.accelStartThree.setVolume(0);
-            
-            this.renderer.setAnimationLoop(() => this.animate());
-        }, { once: true });
     }
 
     animate() {
@@ -155,7 +160,9 @@ class App {
         if (car.instance) {
             const carWorldPos = new THREE.Vector3();
             car.instance.getWorldPosition(carWorldPos);
-            updateParkingZone( carWorldPos, this.enterSignMesh);
+            if(this.enterSignMesh) {
+                updateParkingZone( carWorldPos, this.enterSignMesh);
+            }
             const delta = carWorldPos.clone().sub(this.lastCarPos);
             this.controls.target.add(delta);
             this.camera.position.add(delta);

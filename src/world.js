@@ -29,9 +29,13 @@ export function setupWorld(scene, world, materials, objectsToUpdate, wallBodies,
                 } else if (child.name.startsWith("rock")) {
                     body = createAlignedBody(child, 0, materials.defaultMaterial, new THREE.Vector3(0.7, 1, 0.7));
                     hittableBodies.push(body);
-                } else if (child.name.startsWith("post") || child.name.startsWith("board")) {
-                    const scale = child.name.startsWith("post") ? new THREE.Vector3(0.3, 1, 0.3) : new THREE.Vector3(1, 1, 1);
+                } else if (child.name.startsWith("post")) {
+                    const scale = new THREE.Vector3(0.3, 1, 0.3);
                     body = createAlignedBody(child, 0, materials.defaultMaterial, scale);
+                    hittableBodies.push(body);
+                } else if (child.name.startsWith("board")) {
+                    const scale = new THREE.Vector3(0.2, 1, 1);
+                    body = createBodyForGroup(child, 0, materials.defaultMaterial, scale);
                     hittableBodies.push(body);
                 } else if (child.name.startsWith("tree") || child.name.startsWith("sign")) {
                     const scaleFactor = child.name.startsWith("tree") ? 0.7 : 0.1;
